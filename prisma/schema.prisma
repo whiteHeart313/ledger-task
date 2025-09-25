@@ -1,0 +1,179 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+    id        BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+    email     String     @unique @db.VarChar(255)
+    phone     String?    @db.VarChar(20)
+    firstName String     @map("first_name") @db.VarChar(100)
+    lastName  String     @map("last_name") @db.VarChar(100)
+    status    UserStatus @default(ACTIVE)
+    kycStatus KycStatus  @default(PENDING) @map("kyc_status")
+    createdAt DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+    updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+    // Relations
+    accounts              Account[]
+    initiatedTransactions Transaction[] @relation("TransactionInitiatedBy")
+
+    @@index([email], map: "idx_email")
+    @@index([status], map: "idx_status")
+    @@map("users")
+}
+
+model AccountType {
+    id          Int      @id @default(autoincrement()) @db.UnsignedInt
+    name        String   @unique @db.VarChar(50)
+    description String?  @db.Text
+    isActive    Boolean  @default(true) @map("is_active")
+    createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+    // Relations
+    accounts Account[]
+
+    @@map("account_types")
+}
+
+model Account {
+    id               BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+    accountNumber    String        @unique @map("account_number") @db.VarChar(50)
+    userId           BigInt?       @map("user_id") @db.UnsignedBigInt
+    accountTypeId    Int           @map("account_type_id") @db.UnsignedInt
+    currencyCode     String        @default("USD") @map("currency_code") @db.Char(3)
+    balance          BigInt        @default(0) @db.BigInt
+    availableBalance BigInt        @default(0) @map("available_balance") @db.BigInt
+    status           AccountStatus @default(ACTIVE)
+    dailyLimit       BigInt?       @map("daily_limit") @db.BigInt
+    monthlyLimit     BigInt?       @map("monthly_limit") @db.BigInt
+    createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+    updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+    // Relations
+    user             User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+    accountType      AccountType   @relation(fields: [accountTypeId], references: [id])
+    ledgerEntries    LedgerEntry[]
+    fromTransactions Transaction[] @relation("TransactionFromAccount")
+    toTransactions   Transaction[] @relation("TransactionToAccount")
+
+    @@index([userId], map: "idx_user_id")
+    @@index([accountNumber], map: "idx_account_number")
+    @@index([status, currencyCode], map: "idx_status_currency")
+    @@map("accounts")
+}
+
+model TransactionType {
+    id          Int      @id @default(autoincrement()) @db.UnsignedInt
+    name        String   @unique @db.VarChar(50)
+    description String?  @db.Text
+    isActive    Boolean  @default(true) @map("is_active")
+    createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+    // Relations
+    transactions Transaction[]
+
+    @@map("transaction_types")
+}
+
+model Transaction {
+    id                BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+    idempotencyKey    String            @unique @map("idempotency_key") @db.VarChar(255)
+    referenceNumber   String            @unique @map("reference_number") @db.VarChar(100)
+    externalReference String?           @map("external_reference") @db.VarChar(255)
+    transactionTypeId Int               @map("transaction_type_id") @db.UnsignedInt
+    amount            BigInt            @db.BigInt
+    currencyCode      String            @map("currency_code") @db.Char(3)
+    status            TransactionStatus @default(PENDING)
+    fromAccountId     BigInt?           @map("from_account_id") @db.UnsignedBigInt
+    toAccountId       BigInt?           @map("to_account_id") @db.UnsignedBigInt
+    description       String?           @db.Text
+    metadata          Json?
+    initiatedBy       BigInt?           @map("initiated_by") @db.UnsignedBigInt
+    initiatedAt       DateTime          @default(now()) @map("initiated_at") @db.Timestamp(0)
+    completedAt       DateTime?         @map("completed_at") @db.Timestamp(0)
+    failedAt          DateTime?         @map("failed_at") @db.Timestamp(0)
+    failureReason     String?           @map("failure_reason") @db.Text
+    retryCount        Int               @default(0) @map("retry_count")
+    createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+    updatedAt         DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+    // Relations
+    transactionType TransactionType @relation(fields: [transactionTypeId], references: [id])
+    fromAccount     Account?        @relation("TransactionFromAccount", fields: [fromAccountId], references: [id])
+    toAccount       Account?        @relation("TransactionToAccount", fields: [toAccountId], references: [id])
+    initiatedByUser User?           @relation("TransactionInitiatedBy", fields: [initiatedBy], references: [id], onDelete: SetNull)
+    ledgerEntries   LedgerEntry[]
+
+    @@index([idempotencyKey], map: "idx_idempotency_key")
+    @@index([referenceNumber], map: "idx_reference_number")
+    @@index([externalReference], map: "idx_external_reference")
+    @@index([fromAccountId], map: "idx_from_account")
+    @@index([toAccountId], map: "idx_to_account")
+    @@index([status], map: "idx_status")
+    @@index([createdAt], map: "idx_created_at")
+    @@index([initiatedBy], map: "idx_initiated_by")
+    @@index([currencyCode, status], map: "idx_currency_status")
+    @@map("transactions")
+}
+
+model LedgerEntry {
+    id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+    transactionId BigInt    @map("transaction_id") @db.UnsignedBigInt
+    accountId     BigInt    @map("account_id") @db.UnsignedBigInt
+    entryType     EntryType @map("entry_type")
+    amount        BigInt    @db.BigInt
+    currencyCode  String    @map("currency_code") @db.Char(3)
+    balanceAfter  BigInt    @map("balance_after") @db.BigInt
+    description   String?   @db.Text
+    createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+
+    // Relations
+    transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+    account     Account     @relation(fields: [accountId], references: [id])
+
+    @@index([transactionId], map: "idx_transaction_id")
+    @@index([accountId], map: "idx_account_id")
+    @@index([accountId, createdAt], map: "idx_account_created")
+    @@index([entryType], map: "idx_entry_type")
+    @@map("ledger_entries")
+}
+
+// Enums
+enum UserStatus {
+    ACTIVE
+    SUSPENDED
+    CLOSED
+}
+
+enum KycStatus {
+    PENDING
+    VERIFIED
+    REJECTED
+}
+
+enum AccountStatus {
+    ACTIVE
+    FROZEN
+    CLOSED
+}
+
+enum TransactionStatus {
+    PENDING
+    PROCESSING
+    COMPLETED
+    FAILED
+    CANCELLED
+}
+
+enum EntryType {
+    DEBIT
+    CREDIT
+}
