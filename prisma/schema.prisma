@@ -48,7 +48,7 @@ model Account {
     accountNumber    String        @unique @map("account_number") @db.VarChar(50)
     userId           BigInt?       @map("user_id") @db.UnsignedBigInt
     accountTypeId    Int           @map("account_type_id") @db.UnsignedInt
-    currencyCode     String        @default("USD") @map("currency_code") @db.Char(3)
+    currencyCode     String        @default("EGP") @map("currency_code") @db.Char(3)
     balance          BigInt        @default(0) @db.BigInt
     availableBalance BigInt        @default(0) @map("available_balance") @db.BigInt
     status           AccountStatus @default(ACTIVE)
