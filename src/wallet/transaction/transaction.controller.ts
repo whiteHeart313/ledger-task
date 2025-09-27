@@ -1,20 +1,20 @@
-import { Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
+import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
 import { logger } from "src/utils/logger";
+import { TransactionService } from "./transaction.service";
+import { Transaction } from "@prisma/client";
+import { CreateTransactionDto, TransactionResponseDto } from "../dto/transaction.dto";
 
 
 
 @Controller('v1/transactions')
 
-export class TransactionsController {
+export class TransactionController {
 
-    constructor(private authService: null) {}
+    constructor(private transactionService: TransactionService) {}
 
     @Post("add-transaction")
     @HttpCode(HttpStatus.CREATED)
-    createTransaction() {
-        logger.info("Creating a new transaction...");
-        // auth check 
-        // balance 
-        return { message: "Transaction created successfully" };
+    async createTransaction(@Body() createTransactionDto: CreateTransactionDto) : Promise<TransactionResponseDto> {
+       return this.transactionService.createTransaction(createTransactionDto);
     }
 }
