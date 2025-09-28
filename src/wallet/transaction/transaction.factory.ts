@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { CreateTransactionDto } from '../dto/transaction.dto';
+import { CreateTransactionDto, TransactionResponseDto } from '../dto/transaction.dto';
 import { TransactionData, TransactionType } from 'src/utils/types';
+import { Transaction } from '@prisma/client';
 
 
 
@@ -84,5 +85,25 @@ export class TransactionFactory {
         if (dto.fromAccountId) accounts.add(dto.fromAccountId);
         if (dto.toAccountId) accounts.add(dto.toAccountId);
         return Array.from(accounts);
+    }
+
+    returnTransactionResponseDto(transaction: Transaction): TransactionResponseDto {
+            return {
+            id: transaction.id,
+            amount: transaction.amount,
+            status: transaction.status,
+            fromAccountId: transaction.fromAccountId,
+            toAccountId: transaction.toAccountId,
+            description: transaction.description,
+            metadata: transaction.metadata,
+            initiatedBy: transaction.initiatedBy,
+            initiatedAt: transaction.initiatedAt,
+            updatedAt : transaction.updatedAt,
+            idempotencyKey: transaction.idempotencyKey,
+            referenceNumber: transaction.referenceNumber,
+            externalReference: transaction.externalReference,
+            transactionTypeId: transaction.transactionTypeId,
+            currencyCode: transaction.currencyCode,
+        };
     }
 }
