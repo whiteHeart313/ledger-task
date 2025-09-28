@@ -4,18 +4,33 @@ import { PrismaClient } from '@prisma/client';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(PrismaService.name);
+    private static instance: PrismaService;
 
     constructor() {
+        if (PrismaService.instance) {
+            return PrismaService.instance;
+        }
+
         super({
             log: ['query', 'info', 'warn', 'error'],
             errorFormat: 'pretty',
+            datasources: {
+                db: {
+                    url: process.env.DATABASE_URL,
+                },
+            },
         });
+
+        PrismaService.instance = this;
+        this.logger.log('PrismaService singleton instance created');
     }
 
     async onModuleInit() {
         try {
             await this.$connect();
             this.logger.log('Successfully connected to database');
+            
+            this.logger.log(`Database connection pool established`);
         } catch (error) {
             this.logger.error('Failed to connect to database', error);
             throw error;
