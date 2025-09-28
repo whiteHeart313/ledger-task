@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Account , LedgerEntry, TransactionType as prismaTransactionType, Transaction  } from "@prisma/client";
-import { TransactionStrategy } from "src/utils/types";
+import { serviceReturnType, TransactionStrategy } from "src/utils/types";
 import { CreateTransactionDto } from "src/wallet/dto/transaction.dto";
 import { TransactionFactory } from "../transaction.factory";
 import { PrismaService } from "prisma/prisma.service";
@@ -12,37 +12,65 @@ import { EGP } from '@dinero.js/currencies';
 @Injectable()
 export class TransferStrategy implements TransactionStrategy {
     constructor(private prisma: PrismaService, private transactionFactory: TransactionFactory) {}
-    async processTransaction(createTransactionDto: CreateTransactionDto , transactionType: prismaTransactionType , amountInEGP: bigint): Promise<any> {
+    async processTransaction(createTransactionDto: CreateTransactionDto, transactionType: prismaTransactionType, amountInEGP: bigint): Promise<serviceReturnType<Transaction>> {
+        // Find both accounts
         const fromAccount = await this.prisma.account.findUnique({
             where: { id: createTransactionDto.fromAccountId, status: 'ACTIVE' }
         });
         const toAccount = await this.prisma.account.findUnique({
             where: { id: createTransactionDto.toAccountId, status: 'ACTIVE' }
         });
-        if(!fromAccount) {
+        
+        if (!fromAccount) {
             throw new BadRequestException('From account not found or inactive');
         }
-        if(!toAccount) {
+        if (!toAccount) {
             throw new BadRequestException('To account not found or inactive');
         }
+
+        // Validate sufficient funds
         const fromBalance = dinero({ amount: Number(fromAccount.availableBalance), currency: EGP });
         const transferAmount = dinero({ amount: Number(amountInEGP), currency: EGP });
 
         if (fromBalance.lessThan(transferAmount)) {
             throw new BadRequestException('Insufficient funds for transfer');
         }
+
+        // Create transaction data using factory
         const transactionData = this.transactionFactory.createByType(
-                    createTransactionDto.type,
-                    createTransactionDto,
-                    transactionType.id,
-                    amountInEGP
-                );
-    
+            createTransactionDto.type,
+            createTransactionDto,
+            transactionType.id,
+            amountInEGP
+        );
+
+        // Create the transaction
         const transaction = await this.prisma.transaction.create({
-                data: transactionData
-            });
-        await this.processLedgerEntries(transaction, createTransactionDto, [toAccount,  fromAccount] , amountInEGP);
-        return { message: "Withdraw processed", dto: createTransactionDto };
+            data: transactionData
+        });
+
+        // Process ledger entries
+        await this.processLedgerEntries(transaction, createTransactionDto, [toAccount, fromAccount], amountInEGP);
+
+        // Mark transaction as completed and return full transaction data
+        const completedTransaction = await this.prisma.transaction.update({
+            where: { id: transaction.id },
+            data: {
+                status: 'COMPLETED',
+                completedAt: new Date()
+            },
+            include: {
+                transactionType: true,
+                fromAccount: true,
+                toAccount: true,
+                ledgerEntries: true
+            }
+        });
+
+        return { 
+            message: "Transfer processed successfully", 
+            dto: completedTransaction 
+        };
     }
 
     async processLedgerEntries(
@@ -52,19 +80,11 @@ export class TransferStrategy implements TransactionStrategy {
         amountInEGP: bigint,
     ): Promise<void> {
         const [toAccount, fromAccount] = accounts;
-        const ledgerEntries: LedgerEntry[] = [];
-
-        // Validate sufficient funds using Dinero for precision
-        const fromBalance = dinero({ amount: Number(fromAccount.availableBalance), currency: EGP });
-        const transferAmount = dinero({ amount: Number(amountInEGP), currency: EGP });
-
-        if (fromBalance.lessThan(transferAmount)) {
-            throw new BadRequestException('Insufficient funds for transfer');
-        }
 
         // Calculate new balances for FROM account (source)
         const currentFromBalance = dinero({ amount: Number(fromAccount.balance), currency: EGP });
         const currentFromAvailableBalance = dinero({ amount: Number(fromAccount.availableBalance), currency: EGP });
+        const transferAmount = dinero({ amount: Number(amountInEGP), currency: EGP });
         
         const newFromBalance = currentFromBalance.subtract(transferAmount);
         const newFromAvailableBalance = currentFromAvailableBalance.subtract(transferAmount);
@@ -103,7 +123,7 @@ export class TransferStrategy implements TransactionStrategy {
         });
 
         // Create DEBIT ledger entry for FROM account (money leaving)
-        const debitEntry = await this.prisma.ledgerEntry.create({
+        await this.prisma.ledgerEntry.create({
             data: {
                 transactionId: transaction.id,
                 accountId: fromAccount.id,
@@ -116,7 +136,7 @@ export class TransferStrategy implements TransactionStrategy {
         });
 
         // Create CREDIT ledger entry for TO account (money arriving)
-        const creditEntry = await this.prisma.ledgerEntry.create({
+        await this.prisma.ledgerEntry.create({
             data: {
                 transactionId: transaction.id,
                 accountId: toAccount.id,
@@ -128,9 +148,7 @@ export class TransferStrategy implements TransactionStrategy {
             }
         });
 
-        ledgerEntries.push(debitEntry, creditEntry);
-        
-        // Optional: Log the successful transfer
+        // Log the successful transfer
         console.log(`Transfer completed: ${amountInEGP} EGP from ${fromAccount.accountNumber} to ${toAccount.accountNumber}`);
     }
 }

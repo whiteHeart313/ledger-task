@@ -3,8 +3,8 @@ import {  PrismaService } from "../../../../prisma/prisma.service";
 import { CreateTransactionDto } from "../../dto/transaction.dto";
 import { dinero } from 'dinero.js';
 import { EGP } from '@dinero.js/currencies';
-import { AccountsInvolved, TransactionStrategy } from "src/utils/types";
-import { Account } from "@prisma/client";
+import { AccountsInvolved, serviceReturnType, TransactionStrategy } from "src/utils/types";
+import { Account, Transaction } from "@prisma/client";
 import { TransactionFactory } from "../transaction.factory";
 // Import or define prismaTransactionType
 import { TransactionType as prismaTransactionType } from "@prisma/client";
@@ -24,35 +24,58 @@ export class DepositStrategy implements TransactionStrategy {
      * NO fromAccount needed - money comes from outside the ledger system
      */
 
-    async processTransaction(createTransactionDto: CreateTransactionDto , transactionType: prismaTransactionType , amountInEGP: bigint): Promise<any> {
-        // Implement deposit-specific transaction processing logic here
+    async processTransaction(createTransactionDto: CreateTransactionDto, transactionType: prismaTransactionType, amountInEGP: bigint): Promise<serviceReturnType<Transaction>> {
+        // Find the destination account
         const toAccount = await this.prisma.account.findUnique({
-                    where: { id: createTransactionDto.toAccountId, status: 'ACTIVE' }
-            });
-        if(!toAccount) {
+            where: { id: createTransactionDto.toAccountId, status: 'ACTIVE' }
+        });
+        
+        if (!toAccount) {
             throw new BadRequestException('To account not found or inactive');
         }
-        const transactionData = this.transactionFactory.createByType(
-                createTransactionDto.type,
-                createTransactionDto,
-                transactionType.id,
-                amountInEGP
-            );
 
+        // Create transaction data using factory
+        const transactionData = this.transactionFactory.createByType(
+            createTransactionDto.type,
+            createTransactionDto,
+            transactionType.id,
+            amountInEGP
+        );
+
+        // Create the transaction
         const transaction = await this.prisma.transaction.create({
-                data: transactionData
-            });
-        await this.processLedgerEntries(transaction, createTransactionDto, toAccount , amountInEGP);
-        return { message: "Deposit processed", dto: createTransactionDto };
+            data: transactionData
+        });
+
+        // Process ledger entries
+        await this.processLedgerEntries(transaction, createTransactionDto, toAccount, amountInEGP);
+
+        // Mark transaction as completed and return full transaction data
+        const completedTransaction = await this.prisma.transaction.update({
+            where: { id: transaction.id },
+            data: {
+                status: 'COMPLETED',
+                completedAt: new Date()
+            },
+            include: {
+                transactionType: true,
+                toAccount: true,
+                ledgerEntries: true
+            }
+        });
+
+        return { 
+            message: "Deposit processed successfully", 
+            dto: completedTransaction 
+        };
     }
  
     async processLedgerEntries(
-        transaction: any,
+        transaction: Transaction,
         dto: CreateTransactionDto,
-        toAccount : Account,
+        toAccount: Account,
         amountInEGP: bigint,
     ): Promise<void> {
-
         // Calculate new balance using Dinero for precision
         const currentBalance = dinero({ amount: Number(toAccount.balance), currency: EGP });
         const currentAvailableBalance = dinero({ amount: Number(toAccount.availableBalance), currency: EGP });
@@ -88,18 +111,5 @@ export class DepositStrategy implements TransactionStrategy {
                 description: `DEPOSIT - ${dto.description || 'External deposit (ATM/Bank/Cash)'}`,
             }
         });
-
-        await this.prisma.transaction.update({
-                where: { id: transaction.id },
-                data: {
-                    status: 'COMPLETED',
-                    completedAt: new Date()
-                },
-                include: {
-                    transactionType: true,
-                    toAccount: true,
-                    ledgerEntries: true
-                }
-            });
     }
 }
