@@ -1,15 +1,26 @@
 import { Module } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
 import { TransactionController } from './transaction.controller';
-import { PrismaService } from 'prisma/prisma.service';
 import { TransactionFactory } from './transaction.factory';
+import { TransactionProviderStrategy } from './strategies/provider.strategy';
+import { DepositStrategy } from './strategies/deposit.strategy';
+import { WithdrawStrategy } from './strategies/withdraw.strategy';
+import { TransferStrategy } from './strategies/transfer.strategy';
 
 @Module({
-  imports: [
-
-  ],
+  imports: [],
   controllers: [TransactionController],
-  providers: [TransactionService , PrismaService ,TransactionFactory],
-  exports: [TransactionService,  PrismaService, TransactionFactory],
+  providers: [
+    TransactionService,
+    TransactionFactory,
+    TransactionProviderStrategy,
+    DepositStrategy,
+    WithdrawStrategy,
+    TransferStrategy,
+  ],
+  exports: [
+    TransactionService,
+    TransactionFactory,
+  ],
 })
-export class TransactionModule{}
+export class TransactionModule {}
