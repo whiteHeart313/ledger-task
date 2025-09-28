@@ -59,4 +59,23 @@ export class CreateTransactionDto {
     initiatedBy: bigint;
 }
 
-export class TransactionResponseDto {}
+export class TransactionResponseDto {
+    id: bigint;
+    idempotencyKey: string;
+    referenceNumber: string;
+    externalReference: string | null;
+    transactionTypeId: number;
+    amount: bigint;
+    currencyCode: string;
+    status: string;
+    fromAccountId?: bigint | null;
+    toAccountId?: bigint | null;
+    description?: string | null ;
+    metadata?: any;
+    initiatedBy?: bigint | null ;
+    initiatedAt: Date ;
+    completedAt?: Date | null;
+    failedAt? : Date | null; 
+    createdAt?: Date | null;
+    updatedAt: Date;
+}
