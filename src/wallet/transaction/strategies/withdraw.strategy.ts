@@ -4,7 +4,7 @@ import { CreateTransactionDto } from "../../dto/transaction.dto";
 import { dinero } from 'dinero.js';
 import { EGP } from '@dinero.js/currencies';
 import { TransactionStrategy } from "src/utils/types";
-import { Account, TransactionType as prismaTransactionType } from "@prisma/client";
+import { Account, TransactionType as prismaTransactionType, Transaction } from "@prisma/client";
 import { TransactionFactory } from "../transaction.factory";
 
 
@@ -26,6 +26,10 @@ export class WithdrawStrategy implements TransactionStrategy {
             if(!toAccount) {
                 throw new BadRequestException('To account not found or inactive');
             }
+            const withdrawAmount = dinero({ amount: Number(amountInEGP), currency: EGP });
+            if (withdrawAmount.greaterThan(dinero({ amount: Number(toAccount.availableBalance), currency: EGP }))) {
+                throw new BadRequestException('Insufficient funds for withdrawal');
+            }
             const transactionData = this.transactionFactory.createByType(
                     createTransactionDto.type,
                     createTransactionDto,
@@ -41,7 +45,7 @@ export class WithdrawStrategy implements TransactionStrategy {
         }
 
     async processLedgerEntries(
-            transaction: any,
+            transaction: Transaction,
             dto: CreateTransactionDto,
             toAccount : Account,
             amountInEGP: bigint,

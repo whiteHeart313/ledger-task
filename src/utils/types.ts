@@ -1,4 +1,4 @@
-import { Account, TransactionStatus } from "@prisma/client";
+import { Account, Transaction, TransactionStatus } from "@prisma/client";
 import { CreateTransactionDto } from "src/wallet/dto/transaction.dto";
 import { TransactionType as prismaTransactionType } from "@prisma/client";
 
@@ -24,9 +24,9 @@ export interface AccountsInvolved {
 export interface TransactionStrategy {
     processTransaction(createTransactionDto: CreateTransactionDto , transactionType: prismaTransactionType , amountInEGP: bigint): Promise<any>;
     processLedgerEntries(
-        transaction: any,
+        transaction: Transaction,
         dto: CreateTransactionDto,
-        accounts: Account,
+        accounts: Account[] | Account,
         amountInEGP: bigint,
     ): Promise<void>;
 }
