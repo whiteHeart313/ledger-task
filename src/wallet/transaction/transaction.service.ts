@@ -4,8 +4,9 @@ import { CreateTransactionDto, TransactionResponseDto } from "../dto/transaction
 import { dinero, Dinero } from 'dinero.js';
 import { EGP, USD, EUR } from '@dinero.js/currencies';
 import { TransactionFactory } from "./transaction.factory";
-import { TransactionStrategy } from "src/utils/types";
+import { serviceReturnType, TransactionStrategy } from "src/utils/types";
 import { TransactionProviderStrategy } from "./strategies/provider.strategy";
+import { Transaction } from "@prisma/client";
 @Injectable()
 export class TransactionService {
     constructor(
@@ -46,7 +47,7 @@ export class TransactionService {
         return BigInt(convertedAmount.getAmount());
     }
 
-    async createTransaction(createTransactionDto: CreateTransactionDto): Promise<TransactionResponseDto> {
+    async createTransaction(createTransactionDto: CreateTransactionDto):Promise<serviceReturnType<Transaction>> {
         // Use Prisma transaction for atomicity
         return await this.prisma.$transaction(async (prisma) => {
             
@@ -56,7 +57,7 @@ export class TransactionService {
             if (existingTransaction) {
                 if (existingTransaction.status === 'COMPLETED') {
                     // Return existing completed transaction
-                    return existingTransaction;
+                    return { message: "Transaction already completed", dto: existingTransaction  };
                 } else if (existingTransaction.status === 'PENDING') {
                     throw new ConflictException('Transaction is already being processed');
                 }
@@ -83,8 +84,8 @@ export class TransactionService {
                 throw new BadRequestException(`No strategy found for transaction type: ${createTransactionDto.type}`);
             }
 
-            await transactionStrategy.processTransaction(createTransactionDto , transactionType , amountInEGP);
-            return { message: "Transaction processed", dto: createTransactionDto };
+            const response = await transactionStrategy.processTransaction(createTransactionDto , transactionType , amountInEGP);
+            return { message: `${response.message}`, dto: response.dto };
         });
     }
 
