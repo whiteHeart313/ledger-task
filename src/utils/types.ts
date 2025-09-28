@@ -22,7 +22,11 @@ export interface AccountsInvolved {
     toAccount?: BigInt;
 }
 export interface TransactionStrategy {
-    processTransaction(createTransactionDto: CreateTransactionDto , transactionType: prismaTransactionType , amountInEGP: bigint): Promise<any>;
+    processTransaction(
+        createTransactionDto: CreateTransactionDto,
+        transactionType: prismaTransactionType,
+        amountInEGP: bigint
+    ): Promise<serviceReturnType<Transaction>>;
     processLedgerEntries(
         transaction: Transaction,
         dto: CreateTransactionDto,
@@ -39,4 +43,10 @@ export enum TransactionType {
     REFUND = 'REFUND',
     FEE = 'FEE',
     ADJUSTMENT = 'ADJUSTMENT',
+}
+
+
+export type serviceReturnType<T> = {
+    message: string;
+    dto: T;
 }
