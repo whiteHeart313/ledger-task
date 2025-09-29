@@ -1242,6 +1242,11 @@
   resolved "https://registry.yarnpkg.com/@types/cookiejar/-/cookiejar-2.1.5.tgz#14a3e83fa641beb169a2dd8422d91c3c345a9a78"
   integrity sha512-he+DHOWReW0nghN24E1WUqM0efK4kI9oTqDm6XmK8ZPe2djZ90BSNdGnIyCLzCPw7/pogPlGbzI2wHGGmi4O/Q==
 
+"@types/dinero.js@^1.9.4":
+  version "1.9.4"
+  resolved "https://registry.yarnpkg.com/@types/dinero.js/-/dinero.js-1.9.4.tgz#429034315b82573ea5fc4dce25877ec7e843c12b"
+  integrity sha512-mtJnan4ajy9MqvoJGVXu0tC9EAAzFjeoKc3d+8AW+H/Od9+8IiC59ymjrZF+JdTToyDvkLReacTsc50Z8eYr6Q==
+
 "@types/eslint-scope@^3.7.7":
   version "3.7.7"
   resolved "https://registry.yarnpkg.com/@types/eslint-scope/-/eslint-scope-3.7.7.tgz#3108bd5f18b0cdb277c867b3dd449c9ed7079ac5"
