@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
 import {  PrismaService } from "../../../../prisma/prisma.service";
 import { CreateTransactionDto } from "../../dto/transaction.dto";
-import { dinero } from 'dinero.js';
+import Dinero  from 'dinero.js';
 import { EGP } from '@dinero.js/currencies';
 import { AccountsInvolved, serviceReturnType, TransactionStrategy } from "src/utils/types";
 import { Account, Transaction } from "@prisma/client";
@@ -77,9 +77,9 @@ export class DepositStrategy implements TransactionStrategy {
         amountInEGP: bigint,
     ): Promise<void> {
         // Calculate new balance using Dinero for precision
-        const currentBalance = dinero({ amount: Number(toAccount.balance), currency: EGP });
-        const currentAvailableBalance = dinero({ amount: Number(toAccount.availableBalance), currency: EGP });
-        const depositAmount = dinero({ amount: Number(amountInEGP), currency: EGP });
+        const currentBalance = Dinero({ amount: Number(toAccount.balance), currency: 'EGP' });
+        const currentAvailableBalance = Dinero({ amount: Number(toAccount.availableBalance), currency: 'EGP' });
+        const depositAmount = Dinero({ amount: Number(amountInEGP), currency: 'EGP' });
 
         // Add deposit to both balances
         const newBalance = currentBalance.add(depositAmount);

@@ -3,7 +3,7 @@ import { Account , LedgerEntry, TransactionType as prismaTransactionType, Transa
 import { serviceReturnType, TransactionStrategy } from "src/utils/types";
 import { CreateTransactionDto } from "src/wallet/dto/transaction.dto";
 import { TransactionFactory } from "../transaction.factory";
-import { PrismaService } from "prisma/prisma.service";
+import { PrismaService } from "../../../../prisma/prisma.service";
 import { dinero } from 'dinero.js';
 import { EGP } from '@dinero.js/currencies';
 

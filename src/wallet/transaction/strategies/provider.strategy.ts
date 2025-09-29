@@ -1,4 +1,4 @@
-import { TransactionStrategy, TransactionType } from "src/utils/types";
+import { TransactionStrategy, TransactionType } from "../../../utils/types";
 import { DepositStrategy } from "./deposit.strategy";
 import { WithdrawStrategy } from "./withdraw.strategy";
 import { TransferStrategy } from "./transfer.strategy";

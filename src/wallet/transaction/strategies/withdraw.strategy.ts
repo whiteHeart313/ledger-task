@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../../../prisma/prisma.service";
 import { CreateTransactionDto } from "../../dto/transaction.dto";
-import { dinero } from 'dinero.js';
+import Dinero from 'dinero.js';
 import { EGP } from '@dinero.js/currencies';
 import { serviceReturnType, TransactionStrategy } from "src/utils/types";
 import { Account, TransactionType as prismaTransactionType, Transaction } from "@prisma/client";
@@ -30,9 +30,9 @@ export class WithdrawStrategy implements TransactionStrategy {
         }
 
         // Validate sufficient funds
-        const withdrawAmount = dinero({ amount: Number(amountInEGP), currency: EGP });
-        const availableBalance = dinero({ amount: Number(fromAccount.availableBalance), currency: EGP });
-        
+        const withdrawAmount = Dinero({ amount: Number(amountInEGP), currency: 'EGP' });
+        const availableBalance = Dinero({ amount: Number(fromAccount.availableBalance), currency: 'EGP' });
+
         if (withdrawAmount.greaterThan(availableBalance)) {
             throw new BadRequestException('Insufficient funds for withdrawal');
         }
@@ -80,9 +80,9 @@ export class WithdrawStrategy implements TransactionStrategy {
         amountInEGP: bigint,
     ): Promise<void> {
         // Calculate new balances using Dinero for precision
-        const currentBalance = dinero({ amount: Number(fromAccount.balance), currency: EGP });
-        const currentAvailableBalance = dinero({ amount: Number(fromAccount.availableBalance), currency: EGP });
-        const withdrawAmount = dinero({ amount: Number(amountInEGP), currency: EGP });
+        const currentBalance = Dinero({ amount: Number(fromAccount.balance), currency: 'EGP' });
+        const currentAvailableBalance = Dinero({ amount: Number(fromAccount.availableBalance), currency: 'EGP' });
+        const withdrawAmount = Dinero({ amount: Number(amountInEGP), currency: 'EGP' });
 
         // Subtract withdrawal from both balances
         const newBalance = currentBalance.subtract(withdrawAmount);

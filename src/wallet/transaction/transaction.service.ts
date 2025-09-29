@@ -1,8 +1,7 @@
 import { Injectable, BadRequestException, ConflictException } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateTransactionDto, TransactionResponseDto } from "../dto/transaction.dto";
-import { dinero, Dinero } from 'dinero.js';
-import { EGP, USD, EUR } from '@dinero.js/currencies';
+import Dinero from 'dinero.js';
 import { TransactionFactory } from "./transaction.factory";
 import { serviceReturnType, TransactionStrategy } from "src/utils/types";
 import { TransactionProviderStrategy } from "./strategies/provider.strategy";
@@ -29,22 +28,29 @@ export class TransactionService {
         if (!rate) {
             throw new BadRequestException(`Unsupported currency: ${fromCurrency}`);
         }
-        let sourceMoney: Dinero<number>;
+
+        // For Dinero.js v1, amounts are in smallest currency unit (piasters for EGP, cents for USD/EUR)
+        const amountNumber = Number(amount);
+        let convertedAmount: number;
+
         switch (fromCurrency) {
             case 'USD':
-                sourceMoney = dinero({ amount: Number(amount), currency: USD });
+                // Convert USD cents to EGP piasters
+                convertedAmount = Math.round(amountNumber * rate);
                 break;
             case 'EUR':
-                sourceMoney = dinero({ amount: Number(amount), currency: EUR });
+                // Convert EUR cents to EGP piasters  
+                convertedAmount = Math.round(amountNumber * rate);
                 break;
             case 'EGP':
-                sourceMoney = dinero({ amount: Number(amount), currency: EGP });
+                // Already in EGP piasters
+                convertedAmount = amountNumber;
                 break;
             default:
                 throw new BadRequestException(`Unsupported currency: ${fromCurrency}`);
         }
-        const convertedAmount = sourceMoney.multiply(rate);
-        return BigInt(convertedAmount.getAmount());
+
+        return BigInt(convertedAmount);
     }
 
     async createTransaction(createTransactionDto: CreateTransactionDto):Promise<serviceReturnType<Transaction>> {
@@ -103,16 +109,16 @@ export class TransactionService {
     }
 
     private calculateBalance(currentBalance: bigint, amount: bigint, operation: 'add' | 'subtract'): bigint {
-        const current = dinero({ amount: Number(currentBalance), currency: EGP });
-        const change = dinero({ amount: Number(amount), currency: EGP });
+        const current = Number(currentBalance);
+        const change = Number(amount);
         
-        const result = operation === 'add' ? current.add(change) : current.subtract(change);
+        const result = operation === 'add' ? current + change : current - change;
         
         // Ensure no negative balance
-        if (result.isNegative()) {
+        if (result < 0) {
             throw new BadRequestException('Insufficient funds - balance would become negative');
         }
         
-        return BigInt(result.getAmount());
+        return BigInt(result);
     }
 }
