@@ -4,7 +4,7 @@ import { serviceReturnType, TransactionStrategy } from "src/utils/types";
 import { CreateTransactionDto } from "src/wallet/dto/transaction.dto";
 import { TransactionFactory } from "../transaction.factory";
 import { PrismaService } from "../../../../prisma/prisma.service";
-import { dinero } from 'dinero.js';
+import Dinero from 'dinero.js';
 import { EGP } from '@dinero.js/currencies';
 
 
@@ -29,8 +29,8 @@ export class TransferStrategy implements TransactionStrategy {
         }
 
         // Validate sufficient funds
-        const fromBalance = dinero({ amount: Number(fromAccount.availableBalance), currency: EGP });
-        const transferAmount = dinero({ amount: Number(amountInEGP), currency: EGP });
+        const fromBalance = Dinero({ amount: Number(fromAccount.availableBalance), currency: 'EGP' });
+        const transferAmount = Dinero({ amount: Number(amountInEGP), currency: 'EGP' });
 
         if (fromBalance.lessThan(transferAmount)) {
             throw new BadRequestException('Insufficient funds for transfer');
@@ -82,10 +82,10 @@ export class TransferStrategy implements TransactionStrategy {
         const [toAccount, fromAccount] = accounts;
 
         // Calculate new balances for FROM account (source)
-        const currentFromBalance = dinero({ amount: Number(fromAccount.balance), currency: EGP });
-        const currentFromAvailableBalance = dinero({ amount: Number(fromAccount.availableBalance), currency: EGP });
-        const transferAmount = dinero({ amount: Number(amountInEGP), currency: EGP });
-        
+        const currentFromBalance = Dinero({ amount: Number(fromAccount.balance), currency: 'EGP' });
+        const currentFromAvailableBalance = Dinero({ amount: Number(fromAccount.availableBalance), currency: 'EGP' });
+        const transferAmount = Dinero({ amount: Number(amountInEGP), currency: 'EGP' });
+
         const newFromBalance = currentFromBalance.subtract(transferAmount);
         const newFromAvailableBalance = currentFromAvailableBalance.subtract(transferAmount);
         
@@ -93,9 +93,9 @@ export class TransferStrategy implements TransactionStrategy {
         const newFromAvailableBalanceValue = BigInt(newFromAvailableBalance.getAmount());
 
         // Calculate new balances for TO account (destination)
-        const currentToBalance = dinero({ amount: Number(toAccount.balance), currency: EGP });
-        const currentToAvailableBalance = dinero({ amount: Number(toAccount.availableBalance), currency: EGP });
-        
+        const currentToBalance = Dinero({ amount: Number(toAccount.balance), currency: 'EGP' });
+        const currentToAvailableBalance = Dinero({ amount: Number(toAccount.availableBalance), currency: 'EGP' });
+
         const newToBalance = currentToBalance.add(transferAmount);
         const newToAvailableBalance = currentToAvailableBalance.add(transferAmount);
         
