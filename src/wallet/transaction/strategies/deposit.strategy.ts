@@ -26,6 +26,12 @@ export class DepositStrategy implements TransactionStrategy {
 
     async processTransaction(createTransactionDto: CreateTransactionDto, transactionType: prismaTransactionType, amountInEGP: bigint): Promise<serviceReturnType<Transaction>> {
         // Find the destination account
+        if(!createTransactionDto.toAccountId) {
+            throw new BadRequestException('toAccountId must be provided for deposits , money comes from external source');
+        }
+        if(createTransactionDto.fromAccountId) {
+            throw new BadRequestException('fromAccountId should not be provided for deposits , money comes from external source');
+        }
         const toAccount = await this.prisma.account.findUnique({
             where: { id: createTransactionDto.toAccountId, status: 'ACTIVE' }
         });
