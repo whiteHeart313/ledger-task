@@ -21,6 +21,12 @@ export class WithdrawStrategy implements TransactionStrategy {
      */
     async processTransaction(createTransactionDto: CreateTransactionDto, transactionType: prismaTransactionType, amountInEGP: bigint): Promise<serviceReturnType<Transaction>> {
         // Find the source account
+        if(!createTransactionDto.fromAccountId) {
+            throw new BadRequestException('fromAccountId must be provided for withdrawals , money goes to external destination');
+        }
+        if(createTransactionDto.toAccountId) {
+            throw new BadRequestException('toAccountId should not be provided for withdrawals , money goes to external destination');
+        }
         const fromAccount = await this.prisma.account.findUnique({
             where: { id: createTransactionDto.fromAccountId, status: 'ACTIVE' }
         });
