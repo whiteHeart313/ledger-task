@@ -23,7 +23,10 @@ export class CreateTransactionDto {
 
     @IsNumberString()
     @IsNotEmpty()
-    @Transform(({ value }) => BigInt(value))
+    @IsString()
+    @Transform(({ value }) => {
+        return BigInt(Math.round(parseFloat(value) * 100));
+    })
     amount: bigint;
 
     @IsString()
