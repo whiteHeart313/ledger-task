@@ -46,7 +46,7 @@ export class TransactionService {
     }
 
     async createTransaction(createTransactionDto: CreateTransactionDto):Promise<serviceReturnType<Transaction>> {
-        try {
+        
         const validatedAmount = this.validateAmount(
         createTransactionDto.amount, 
         createTransactionDto.type
@@ -75,12 +75,6 @@ export class TransactionService {
             const response = await transactionStrategy.processTransaction({...createTransactionDto , amount : validatedAmount} , transactionType , amountInEGP);
             return { message: `${response.message}`, dto: response.dto };
         });
-    } catch (error) {
-        if (error instanceof BadRequestException || error instanceof ConflictException) {
-            return Promise.reject(error);
-        }
-        throw error;
-    }
 }
     
 

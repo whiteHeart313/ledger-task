@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post } from "@nestjs/common";
+import { BadRequestException, Body, ConflictException, Controller, Get, HttpCode, HttpStatus, Post } from "@nestjs/common";
 import { logger } from "src/utils/logger";
 import { TransactionService } from "./transaction.service";
 import { Transaction } from "@prisma/client";
@@ -56,6 +56,14 @@ export class TransactionController {
     @Post("add-transaction")
     @HttpCode(HttpStatus.CREATED)
     async createTransaction(@Body() createTransactionDto: CreateTransactionDto) : Promise<{ message: string, dto: Transaction  }> {
+        try {
        return this.transactionService.createTransaction(createTransactionDto);
+        } catch (error) {
+            if (error instanceof BadRequestException || error instanceof ConflictException) {
+                throw error;
+            }
+            throw error;
+        }
     }
 }
+
