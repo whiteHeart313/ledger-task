@@ -46,7 +46,7 @@ export class TransactionService {
     }
 
     async createTransaction(createTransactionDto: CreateTransactionDto):Promise<serviceReturnType<Transaction>> {
-        // Use Prisma transaction for atomicity
+        try {
         const validatedAmount = this.validateAmount(
         createTransactionDto.amount, 
         createTransactionDto.type
@@ -63,7 +63,7 @@ export class TransactionService {
             );
             
             const amountInEGP = await this.convertToEGP(
-                createTransactionDto.amount, 
+                validatedAmount, 
                 createTransactionDto.currencyCode
             );
             this.validateAccountsAndTransactionType(createTransactionDto);
@@ -72,10 +72,16 @@ export class TransactionService {
             if(!transactionStrategy) {
                 throw new BadRequestException(`No strategy found for transaction type: ${createTransactionDto.type}`);
             }
-            const response = await transactionStrategy.processTransaction(createTransactionDto , transactionType , amountInEGP);
+            const response = await transactionStrategy.processTransaction({...createTransactionDto , amount : validatedAmount} , transactionType , amountInEGP);
             return { message: `${response.message}`, dto: response.dto };
         });
+    } catch (error) {
+        if (error instanceof BadRequestException || error instanceof ConflictException) {
+            return Promise.reject(error);
+        }
+        throw error;
     }
+}
     
 
     async getTransactionByIdempotencyKey(idempotencyKey: string) {
