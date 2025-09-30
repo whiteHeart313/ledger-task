@@ -40,7 +40,6 @@ export class DepositStrategy implements TransactionStrategy {
             throw new BadRequestException('To account not found or inactive');
         }
 
-        // Create transaction data using factory
         const transactionData = this.transactionFactory.createByType(
             createTransactionDto.type,
             createTransactionDto,
@@ -48,15 +47,12 @@ export class DepositStrategy implements TransactionStrategy {
             amountInEGP
         );
 
-        // Create the transaction
         const transaction = await this.prisma.transaction.create({
             data: transactionData
         });
 
-        // Process ledger entries
         await this.processLedgerEntries(transaction, createTransactionDto, toAccount, amountInEGP);
 
-        // Mark transaction as completed and return full transaction data
         const completedTransaction = await this.prisma.transaction.update({
             where: { id: transaction.id },
             data: {
