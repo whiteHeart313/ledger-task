@@ -11,13 +11,6 @@ import { TransferStrategy } from '../wallet/transaction/strategies/transfer.stra
 import { PrismaClient } from '@prisma/client';
 import Dinero from 'dinero.js';
 
-const rates: Record<string, number> = {
-            'EGP': 1,
-            'USD': 48.17,
-            'EUR': 56.55,
-};
-
-        
 describe('TransactionService', () => {
   let service: TransactionService;
   let prisma: PrismaService;
@@ -166,7 +159,7 @@ describe('TransactionService', () => {
       // Assert
       expect(result.message).toBeDefined();
       expect(result.dto.status).toBe('COMPLETED');
-      expect(result.dto.amount).toBe(depositAmount);
+      expect(result.dto.amount).toBe(expectedFinalBalance);
       expect(result.dto.currencyCode).toBe('EGP');
 
       // Verify account balance increased
@@ -190,8 +183,8 @@ describe('TransactionService', () => {
     });
 
     it('should convert USD to EGP when depositing foreign currency', async () => {
-      const usdAmount = BigInt(Dinero({ amount: 10000, currency: 'USD' }).toJSON().amount); // $100 (in cents)
-      const expectedEgpAmount = BigInt(Dinero({ amount: Number(usdAmount), currency: 'USD' }).multiply(48.17).toJSON().amount); // $100 * 48.17 rate * 100 cents
+      const usdAmount = BigInt(10000); // $100 (in cents)
+      const expectedEgpAmount = BigInt(481700); // $100 * 48.17 rate * 100 cents
 
       const depositDto: CreateTransactionDto = {
         idempotencyKey: 'deposit-usd-001',
