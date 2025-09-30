@@ -79,19 +79,16 @@ export class WithdrawStrategy implements TransactionStrategy {
         fromAccount: Account,
         amountInEGP: bigint,
     ): Promise<void> {
-        // Calculate new balances using Dinero for precision
         const currentBalance = Dinero({ amount: Number(fromAccount.balance), currency: 'EGP' });
         const currentAvailableBalance = Dinero({ amount: Number(fromAccount.availableBalance), currency: 'EGP' });
         const withdrawAmount = Dinero({ amount: Number(amountInEGP), currency: 'EGP' });
 
-        // Subtract withdrawal from both balances
         const newBalance = currentBalance.subtract(withdrawAmount);
         const newAvailableBalance = currentAvailableBalance.subtract(withdrawAmount);
         
         const newBalanceValue = BigInt(newBalance.getAmount());
         const newAvailableBalanceValue = BigInt(newAvailableBalance.getAmount());
-
-        // Update account balance (money is now out of the account)
+        
         await this.prisma.account.update({
             where: { id: fromAccount.id },
             data: {
@@ -107,7 +104,7 @@ export class WithdrawStrategy implements TransactionStrategy {
             data: {
                 transactionId: transaction.id,
                 accountId: fromAccount.id,
-                entryType: 'DEBIT', // Money going out = Debit
+                entryType: 'DEBIT', 
                 amount: amountInEGP,
                 currencyCode: 'EGP',
                 balanceAfter: newBalanceValue,
