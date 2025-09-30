@@ -3,7 +3,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateTransactionDto, TransactionResponseDto } from "../dto/transaction.dto";
 import Dinero from 'dinero.js';
 import { TransactionFactory } from "./transaction.factory";
-import { serviceReturnType, TransactionStrategy } from "src/utils/types";
+import { serviceReturnType, TransactionStrategy, TransactionType } from "src/utils/types";
 import { TransactionProviderStrategy } from "./strategies/provider.strategy";
 import { Transaction } from "@prisma/client";
 @Injectable()
@@ -51,6 +51,9 @@ export class TransactionService {
 
     async createTransaction(createTransactionDto: CreateTransactionDto):Promise<serviceReturnType<Transaction>> {
         // Use Prisma transaction for atomicity
+        if(createTransactionDto.amount < 0 && createTransactionDto.type !== TransactionType.WITHDRAWAL){
+            throw new ConflictException('negative amount only comes with Withdraw transaction')
+        }
         return await this.prisma.$transaction(async (prisma) => {
             
             // 1. Check idempotency - prevent duplicate processing
@@ -85,6 +88,7 @@ export class TransactionService {
             if(!transactionStrategy) {
                 throw new BadRequestException(`No strategy found for transaction type: ${createTransactionDto.type}`);
             }
+            
 
             const response = await transactionStrategy.processTransaction(createTransactionDto , transactionType , amountInEGP);
             return { message: `${response.message}`, dto: response.dto };

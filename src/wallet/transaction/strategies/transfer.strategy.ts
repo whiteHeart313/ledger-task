@@ -103,41 +103,23 @@ export class TransferStrategy implements TransactionStrategy {
         const newToAvailableBalanceValue = BigInt(newToAvailableBalance.getAmount());
 
         // Update FROM account balance (debit)
-        await this.prisma.account.update({
-            where: { id: fromAccount.id },
-            data: {
-                balance: newFromBalanceValue,
-                availableBalance: newFromAvailableBalanceValue,
-                updatedAt: new Date()
-            }
-        });
+         await Promise.all
+         ([
+            this.updateAccount(fromAccount.id, newFromBalanceValue, newFromAvailableBalanceValue),
+            this.updateAccount(toAccount.id, newToBalanceValue, newToAvailableBalanceValue)
+         ]);
 
-        // Update TO account balance (credit)
-        await this.prisma.account.update({
-            where: { id: toAccount.id },
-            data: {
-                balance: newToBalanceValue,
-                availableBalance: newToAvailableBalanceValue,
-                updatedAt: new Date()
-            }
-        });
-
-        // Create DEBIT ledger entry for FROM account (money leaving)
-        await this.prisma.ledgerEntry.create({
-            data: {
+        await Promise.all([
+            this.createLedgerEntry({
                 transactionId: transaction.id,
                 accountId: fromAccount.id,
                 entryType: 'DEBIT',
                 amount: amountInEGP,
                 currencyCode: 'EGP',
                 balanceAfter: newFromBalanceValue,
-                description: `TRANSFER OUT - ${dto.description || `Transfer to account ${toAccount.accountNumber}`}`,
-            }
-        });
-
-        // Create CREDIT ledger entry for TO account (money arriving)
-        await this.prisma.ledgerEntry.create({
-            data: {
+                description: `TRANSFER OUT - ${dto.description || `Transfer to account ${toAccount.accountNumber}`}`
+            }), 
+            this.createLedgerEntry({
                 transactionId: transaction.id,
                 accountId: toAccount.id,
                 entryType: 'CREDIT',
@@ -145,11 +127,36 @@ export class TransferStrategy implements TransactionStrategy {
                 currencyCode: 'EGP',
                 balanceAfter: newToBalanceValue,
                 description: `TRANSFER IN - ${dto.description || `Transfer from account ${fromAccount.accountNumber}`}`,
-            }
-        });
+            }), 
+
+         ])
 
         // Log the successful transfer
         console.log(`Transfer completed: ${amountInEGP} EGP from ${fromAccount.accountNumber} to ${toAccount.accountNumber}`);
     }
-}
 
+    async updateAccount(accountId: bigint, balance: bigint, availableBalance: bigint): Promise<void> {
+        await this.prisma.account.update({
+            where: { id: accountId },
+            data: {
+                balance,
+                availableBalance,
+                updatedAt: new Date()
+            }
+        });
+    }
+
+    async createLedgerEntry(entry: Partial<LedgerEntry>): Promise<void> {
+        await this.prisma.ledgerEntry.create({
+            data: {
+                transactionId: entry.transactionId!,
+                accountId: entry.accountId!,
+                entryType: entry.entryType!,
+                amount: entry.amount!,
+                currencyCode: entry.currencyCode!,
+                balanceAfter: entry.balanceAfter!,
+                description: entry.description!
+            }
+        });
+    }
+}
