@@ -30,27 +30,23 @@ export class TransactionService {
         }
 
         // For Dinero.js v1, amounts are in smallest currency unit (piasters for EGP, cents for USD/EUR)
-        const amountNumber = Number(amount);
-        let convertedAmount: number;
+        let sourceMoney: Dinero.Dinero;
 
         switch (fromCurrency) {
             case 'USD':
-                // Convert USD cents to EGP piasters
-                convertedAmount = Math.round(amountNumber * rate);
+                sourceMoney = Dinero({ amount: Number(amount), currency: 'USD' });
                 break;
             case 'EUR':
-                // Convert EUR cents to EGP piasters  
-                convertedAmount = Math.round(amountNumber * rate);
+                sourceMoney = Dinero({ amount: Number(amount), currency: 'EUR' });
                 break;
             case 'EGP':
-                // Already in EGP piasters
-                convertedAmount = amountNumber;
+                sourceMoney = Dinero({ amount: Number(amount), currency: 'EGP' });
                 break;
             default:
                 throw new BadRequestException(`Unsupported currency: ${fromCurrency}`);
         }
-
-        return BigInt(convertedAmount);
+        const convertedAmount = sourceMoney.multiply(rate);
+        return BigInt(convertedAmount.getAmount());
     }
 
     async createTransaction(createTransactionDto: CreateTransactionDto):Promise<serviceReturnType<Transaction>> {
