@@ -12,9 +12,14 @@ export class TransactionService {
         private readonly prisma: PrismaService,
     ) {}
 
+    private readonly MAX_SAFE_AMOUNT = BigInt(Number.MAX_SAFE_INTEGER);
 
     private async convertToEGP(amount: bigint, fromCurrency: string): Promise<bigint> {
-        
+        if (amount > this.MAX_SAFE_AMOUNT) {
+            throw new BadRequestException(
+                `Amount exceeds maximum safe value for conversion: ${this.MAX_SAFE_AMOUNT}`
+            );
+        }
         const rates: Record<string, number> = {
             'EGP': 1,
             'USD': 48.17,
