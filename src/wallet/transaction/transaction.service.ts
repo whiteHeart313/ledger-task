@@ -1,23 +1,20 @@
 import { Injectable, BadRequestException, ConflictException } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
-import { CreateTransactionDto, TransactionResponseDto } from "../dto/transaction.dto";
+import { CreateTransactionDto} from "../dto/transaction.dto";
 import Dinero from 'dinero.js';
-import { TransactionFactory } from "./transaction.factory";
-import { serviceReturnType, TransactionStrategy, TransactionType } from "src/utils/types";
+import { serviceReturnType, TransactionType } from "src/utils/types";
 import { TransactionProviderStrategy } from "./strategies/provider.strategy";
-import { Transaction } from "@prisma/client";
+import { Prisma, PrismaClient, Transaction } from "@prisma/client";
+import { DefaultArgs } from "@prisma/client/runtime/library";
 @Injectable()
 export class TransactionService {
     constructor(
         private readonly prisma: PrismaService,
-        private readonly transactionFactory: TransactionFactory
     ) {}
 
-    private strategies : Map<string, TransactionStrategy> = new Map()
 
-    // Mock currency conversion service
     private async convertToEGP(amount: bigint, fromCurrency: string): Promise<bigint> {
-        // Mock conversion rates (in production, use real exchange rates)
+        
         const rates: Record<string, number> = {
             'EGP': 1,
             'USD': 48.17,
@@ -29,7 +26,6 @@ export class TransactionService {
             throw new BadRequestException(`Unsupported currency: ${fromCurrency}`);
         }
 
-        // For Dinero.js v1, amounts are in smallest currency unit (piasters for EGP, cents for USD/EUR)
         let sourceMoney: Dinero.Dinero;
 
         switch (fromCurrency) {
@@ -51,51 +47,37 @@ export class TransactionService {
 
     async createTransaction(createTransactionDto: CreateTransactionDto):Promise<serviceReturnType<Transaction>> {
         // Use Prisma transaction for atomicity
-        if(createTransactionDto.amount < 0 && createTransactionDto.type !== TransactionType.WITHDRAWAL){
-            throw new ConflictException('negative amount only comes with Withdraw transaction')
-        }
+        const validatedAmount = this.validateAmount(
+        createTransactionDto.amount, 
+        createTransactionDto.type
+        );
         return await this.prisma.$transaction(async (prisma) => {
             
-            // 1. Check idempotency - prevent duplicate processing
-            const existingTransaction = await this.getTransactionByIdempotencyKey(createTransactionDto.idempotencyKey);
+            const existing = await this.checkIdempotency(createTransactionDto.idempotencyKey);
+            if (existing) return existing;
 
-            if (existingTransaction) {
-                if (existingTransaction.status === 'COMPLETED') {
-                    // Return existing completed transaction
-                    return { message: "Transaction already completed", dto: existingTransaction  };
-                } else if (existingTransaction.status === 'PENDING') {
-                    throw new ConflictException('Transaction is already being processed');
-                }
-            }
-
-            const transactionType = await prisma.transactionType.findFirst({
-                where: { name: createTransactionDto.type, isActive: true }
-            });
-
-            if (!transactionType) {
-                throw new BadRequestException(`Invalid transaction type: ${createTransactionDto.type}`);
-            }
-
+            
+            const transactionType = await this.getActiveTransactionType(
+            prisma, 
+            createTransactionDto.type
+            );
+            
             const amountInEGP = await this.convertToEGP(
                 createTransactionDto.amount, 
                 createTransactionDto.currencyCode
             );
-
-            if(!createTransactionDto.fromAccountId && !createTransactionDto.toAccountId) {
-                throw new BadRequestException('At least one of fromAccountId or toAccountId must be provided');
-            }
+            this.validateAccountsAndTransactionType(createTransactionDto);
+            
             const transactionStrategy = TransactionProviderStrategy.getStrategy(createTransactionDto.type , this.prisma);
             if(!transactionStrategy) {
                 throw new BadRequestException(`No strategy found for transaction type: ${createTransactionDto.type}`);
             }
-            
-
             const response = await transactionStrategy.processTransaction(createTransactionDto , transactionType , amountInEGP);
             return { message: `${response.message}`, dto: response.dto };
         });
     }
+    
 
-    // Get transaction by idempotency key (for checking duplicates)
     async getTransactionByIdempotencyKey(idempotencyKey: string) {
         return this.prisma.transaction.findUnique({
             where: { idempotencyKey },
@@ -108,17 +90,60 @@ export class TransactionService {
         });
     }
 
-    private calculateBalance(currentBalance: bigint, amount: bigint, operation: 'add' | 'subtract'): bigint {
-        const current = Number(currentBalance);
-        const change = Number(amount);
-        
-        const result = operation === 'add' ? current + change : current - change;
-        
-        // Ensure no negative balance
-        if (result < 0) {
-            throw new BadRequestException('Insufficient funds - balance would become negative');
+    private validateAmount(amount: bigint, type: TransactionType): bigint {
+        if (amount < 0 && type !== TransactionType.WITHDRAWAL) {
+            throw new BadRequestException('Negative amounts only allowed for withdrawals');
         }
-        
-        return BigInt(result);
+        return amount < 0 ? BigInt(Math.abs(Number(amount))) : amount;
+    }
+    private async getActiveTransactionType(prisma: Omit<PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">, type: TransactionType) {
+        const transaction = await prisma.transactionType.findFirst({
+            where: { name: type, isActive: true }
+        });
+        if (!transaction) {
+            throw new BadRequestException(`Invalid transaction type: ${type}`);
+        }
+        return transaction;
+    }
+
+    private async checkIdempotency(idempotencyKey: string): Promise<serviceReturnType<Transaction> | null> {
+        const existingTransaction = await this.getTransactionByIdempotencyKey(idempotencyKey);
+
+            if (existingTransaction) {
+                if (existingTransaction.status === 'COMPLETED') {
+                    // Return existing completed transaction
+                    return { message: "Transaction already completed", dto: existingTransaction  };
+                } else if (existingTransaction.status === 'PENDING') {
+                    throw new ConflictException('Transaction is already being processed');
+                }
+            }
+        return null;
+    }
+
+    private validateAccountsAndTransactionType(createTransactionDto: CreateTransactionDto) {
+        if(!createTransactionDto.fromAccountId && !createTransactionDto.toAccountId) {
+            throw new BadRequestException('At least one of fromAccountId or toAccountId must be provided');
+        }
+        if(createTransactionDto.type === TransactionType.TRANSFER) {
+            if(!createTransactionDto.fromAccountId || !createTransactionDto.toAccountId) {
+                throw new BadRequestException('Both fromAccountId and toAccountId must be provided for transfers');
+            }
+        }
+        if(createTransactionDto.type === TransactionType.DEPOSIT) {
+            if(!createTransactionDto.toAccountId) {
+                throw new BadRequestException('toAccountId must be provided for deposits , money comes from external source');
+            }
+            if(createTransactionDto.fromAccountId) {
+                throw new BadRequestException('fromAccountId should not be provided for deposits , money comes from external source');
+            }
+        }
+        if(createTransactionDto.type === TransactionType.WITHDRAWAL) {
+            if(!createTransactionDto.fromAccountId) {
+                throw new BadRequestException('fromAccountId must be provided for withdrawals , money goes to external destination');
+            }
+            if(createTransactionDto.toAccountId) {
+                throw new BadRequestException('toAccountId should not be provided for withdrawals , money goes to external destination');
+            }
+        }
     }
 }
